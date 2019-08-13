@@ -24,9 +24,12 @@ type sigtermHandler struct {
 	observer.Subject
 	sigChannel chan os.Signal
 	timeout    time.Duration
+	mu         sync.Mutex
 }
 
 func (s *sigtermHandler) SetTimeout(duration time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.timeout = duration
 }
 
@@ -53,6 +56,8 @@ func getSigtermHandlerFunc() func() SigtermHandler {
 			go func() {
 				select {
 				case s := <-sigtermHdl.sigChannel:
+					sigtermHdl.mu.Lock()
+					defer sigtermHdl.mu.Unlock()
 					signalsReceived++
 					logger.S().Info("Receive signal: ", s)
 					if signalsReceived == 1 {
