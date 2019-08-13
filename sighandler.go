@@ -17,6 +17,7 @@ var (
 
 type SigtermHandler interface {
 	RegisterDeferFunc(func())
+	RegisterDeferFuncWithCancel(func()) func()
 	SetTimeout(time.Duration)
 }
 
@@ -37,6 +38,16 @@ func (s *sigtermHandler) RegisterDeferFunc(f func()) {
 	s.RegisterObserver(observer.Func(func(data interface{}) {
 		f()
 	}))
+}
+
+func (s *sigtermHandler) RegisterDeferFuncWithCancel(f func()) func() {
+	obs := observer.Func(func(data interface{}) {
+		f()
+	})
+	s.RegisterObserver(obs)
+	return func() {
+		s.UnregisterObserver(obs)
+	}
 }
 
 func getSigtermHandlerFunc() func() SigtermHandler {
