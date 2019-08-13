@@ -11,6 +11,10 @@ import (
 	"github.com/hieua1/observer"
 )
 
+var (
+	GetSigtermHandler = getSigtermHandlerFunc()
+)
+
 type SigtermHandler interface {
 	RegisterDeferFunc(func())
 	SetTimeout(time.Duration)
@@ -32,10 +36,6 @@ func (s *sigtermHandler) RegisterDeferFunc(f func()) {
 	}))
 }
 
-var (
-	GetSigtermHandler = getSigtermHandlerFunc()
-)
-
 func getSigtermHandlerFunc() func() SigtermHandler {
 	var (
 		sigtermHdl     *sigtermHandler
@@ -55,7 +55,7 @@ func getSigtermHandlerFunc() func() SigtermHandler {
 				case s := <-sigtermHdl.sigChannel:
 					signalsReceived++
 					logger.S().Info("Receive signal: ", s)
-					if signalsReceived==1 {
+					if signalsReceived == 1 {
 						if sigtermHdl.timeout > 0 {
 							go func() {
 								select {
@@ -77,5 +77,3 @@ func getSigtermHandlerFunc() func() SigtermHandler {
 		return sigtermHdl
 	}
 }
-
-
