@@ -13,12 +13,23 @@ import (
 
 type SigtermHandler interface {
 	RegisterDeferFunc(func())
+	SetTimeout(time.Duration)
 }
 
 type sigtermHandler struct {
 	observer.Subject
 	sigChannel chan os.Signal
 	timeout    time.Duration
+}
+
+func (s *sigtermHandler) SetTimeout(duration time.Duration) {
+	s.timeout = duration
+}
+
+func (s *sigtermHandler) RegisterDeferFunc(f func()) {
+	s.RegisterObserver(observer.Func(func(data interface{}) {
+		f()
+	}))
 }
 
 var (
@@ -38,21 +49,28 @@ func getSigtermHandlerFunc() func() SigtermHandler {
 				timeout:    -1,
 			}
 			signal.Notify(sigtermHdl.sigChannel, os.Interrupt, syscall.SIGTERM)
+			signalsReceived := 0
 			go func() {
 				select {
 				case s := <-sigtermHdl.sigChannel:
+					signalsReceived++
 					logger.S().Info("Receive signal: ", s)
-					if sigtermHdl.timeout > 0 {
-						go func() {
-							select {
-							case <-time.After(sigtermHdl.timeout):
-								logger.S().Info("Timeout! Force application to exit.")
-								os.Exit(1)
-							}
-						}()
+					if signalsReceived==1 {
+						if sigtermHdl.timeout > 0 {
+							go func() {
+								select {
+								case <-time.After(sigtermHdl.timeout):
+									logger.S().Info("Timeout! Force application to exit.")
+									os.Exit(1)
+								}
+							}()
+						}
+						logger.S().Info("Waiting for gracefully finishing current works before shutdown...")
+						sigtermHdl.NotifyAll(nil)
+					} else {
+						logger.S().Info("One more signal received. Force application to exit.")
+						os.Exit(1)
 					}
-					logger.S().Info("Waiting for gracefully finishing current works before shutdown...")
-					sigtermHdl.NotifyAll(nil)
 				}
 			}()
 		})
@@ -60,8 +78,4 @@ func getSigtermHandlerFunc() func() SigtermHandler {
 	}
 }
 
-func (s *sigtermHandler) RegisterDeferFunc(f func()) {
-	s.RegisterObserver(observer.Func(func(data interface{}) {
-		f()
-	}))
-}
+
