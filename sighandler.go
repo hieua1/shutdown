@@ -72,6 +72,7 @@ func getSigtermHandlerFunc() func() SigtermHandler {
 			signal.Notify(sigtermHdl.sigChannel, os.Interrupt, syscall.SIGTERM)
 			signalsReceived := 0
 			go func() {
+				defer close(sigtermHdl.done)
 				select {
 				case s := <-sigtermHdl.sigChannel:
 					sigtermHdl.mu.Lock()
@@ -95,7 +96,6 @@ func getSigtermHandlerFunc() func() SigtermHandler {
 						os.Exit(1)
 					}
 				}
-				close(sigtermHdl.done)
 			}()
 		})
 		return sigtermHdl
