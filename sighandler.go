@@ -19,6 +19,7 @@ type SigtermHandler interface {
 	RegisterDeferFunc(func())
 	RegisterDeferFuncWithCancel(func()) func()
 	SetTimeout(time.Duration)
+	WaitForSigtermHandler()
 }
 
 type sigtermHandler struct {
@@ -26,6 +27,7 @@ type sigtermHandler struct {
 	sigChannel chan os.Signal
 	timeout    time.Duration
 	mu         sync.Mutex
+	done       chan struct{}
 }
 
 func (s *sigtermHandler) SetTimeout(duration time.Duration) {
@@ -50,6 +52,10 @@ func (s *sigtermHandler) RegisterDeferFuncWithCancel(f func()) func() {
 	}
 }
 
+func (s *sigtermHandler) WaitForSigtermHandler() {
+	<-s.done
+}
+
 func getSigtermHandlerFunc() func() SigtermHandler {
 	var (
 		sigtermHdl     *sigtermHandler
@@ -61,6 +67,7 @@ func getSigtermHandlerFunc() func() SigtermHandler {
 				Subject:    new(observer.BaseSubject),
 				sigChannel: make(chan os.Signal, 1),
 				timeout:    -1,
+				done: make(chan struct{}),
 			}
 			signal.Notify(sigtermHdl.sigChannel, os.Interrupt, syscall.SIGTERM)
 			signalsReceived := 0
@@ -88,6 +95,7 @@ func getSigtermHandlerFunc() func() SigtermHandler {
 						os.Exit(1)
 					}
 				}
+				close(sigtermHdl.done)
 			}()
 		})
 		return sigtermHdl
