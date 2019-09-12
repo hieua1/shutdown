@@ -15,13 +15,6 @@ var (
 	GetSigtermHandler = getSigtermHandlerFunc()
 )
 
-type SigtermHandler interface {
-	RegisterDeferFunc(func())
-	RegisterDeferFuncWithCancel(func()) func()
-	SetTimeout(time.Duration)
-	WaitForSigtermHandler()
-}
-
 type sigtermHandler struct {
 	observer.Subject
 	sigChannel chan os.Signal
@@ -56,18 +49,18 @@ func (s *sigtermHandler) WaitForSigtermHandler() {
 	<-s.done
 }
 
-func getSigtermHandlerFunc() func() SigtermHandler {
+func getSigtermHandlerFunc() func() *sigtermHandler {
 	var (
 		sigtermHdl     *sigtermHandler
 		sigHdlInitOnce sync.Once
 	)
-	return func() SigtermHandler {
+	return func() *sigtermHandler {
 		sigHdlInitOnce.Do(func() {
 			sigtermHdl = &sigtermHandler{
 				Subject:    new(observer.BaseSubject),
 				sigChannel: make(chan os.Signal, 1),
 				timeout:    -1,
-				done: make(chan struct{}),
+				done:       make(chan struct{}),
 			}
 			signal.Notify(sigtermHdl.sigChannel, os.Interrupt, syscall.SIGTERM)
 			signalsReceived := 0
